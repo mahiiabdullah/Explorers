@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,8 +30,8 @@ const MOCK_BOOKING: Booking = {
   createdAt: '2026-08-10T10:00:00Z',
 };
 
-export default function PayPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function PayPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const booking = { ...MOCK_BOOKING, id };
   const convenienceFee = 3000;
 

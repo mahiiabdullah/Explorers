@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, use } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Check, Download, CalendarPlus, Ticket } from 'lucide-react';
@@ -9,8 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ConfettiOnMount } from '@/components/magicui/confetti';
 import { formatDate, formatTime } from '@/lib/utils';
 
-export default function ConfirmedPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ConfirmedPage({ params }: { params: { id: string } }) {
+  const { id } = params;
 
   return (
     <div className="container max-w-2xl py-12">

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -41,8 +41,8 @@ const MOCK_DATA: SeatMapResponse = {
   ).flat(),
 };
 
-export default function SeatMapPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function SeatMapPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const showtimeId = Number(id);
   const [holding, setHolding] = useState(false);

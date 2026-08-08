@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Star, Clock, Calendar, Play, ArrowLeft } from 'lucide-react';
@@ -32,8 +32,8 @@ const MOCK_SHOWTIMES: Showtime[] = [
   { id: 105, movieId: 1, screenId: 7, theatreName: 'INOX Forum', startsAt: '2026-08-15T20:00:00Z', basePrice: 40000, availableSeats: 8, totalSeats: 180 },
 ];
 
-export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function MovieDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [selectedDate, setSelectedDate] = useState(new Date('2026-08-15'));
 
   const dates = Array.from({ length: 7 }, (_, i) => new Date(2026, 7, 15 + i));
