@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SeatMap } from '@/components/seat-map/SeatMap';
+import { useSeatMapStore } from '@/stores/seat-map-store';
 import type { Seat } from '@/lib/types';
 
 const MOCK_SEATS: Seat[] = [
@@ -33,5 +34,3 @@ describe('SeatMap', () => {
     expect(heldSeat).toBeDisabled();
   });
 });
-
-import { useSeatMapStore } from '@/stores/seat-map-store';

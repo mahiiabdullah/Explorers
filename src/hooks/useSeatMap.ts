@@ -8,7 +8,13 @@ import { toast } from '@/components/ui/toaster';
 import type { SeatMapResponse, Seat } from '@/lib/types';
 
 export function useSeatMap(showtimeId: number) {
-  const { seats, setSeats, updateSeat, setViewerCount, selectedIds, clearSelection } = useSeatMapStore();
+  const seats = useSeatMapStore((s) => s.seats);
+  const setSeats = useSeatMapStore((s) => s.setSeats);
+  const updateSeat = useSeatMapStore((s) => s.updateSeat);
+  const viewerCount = useSeatMapStore((s) => s.viewerCount);
+  const setViewerCount = useSeatMapStore((s) => s.setViewerCount);
+  const selectedIds = useSeatMapStore((s) => s.selectedIds);
+  const clearSelection = useSeatMapStore((s) => s.clearSelection);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,5 +79,5 @@ export function useSeatMap(showtimeId: number) {
 
   const selectedSeats: Seat[] = seats.filter((s) => selectedIds.has(s.id));
 
-  return { seats, loading, error, selectedSeats, viewerCount: useSeatMapStore.getState().viewerCount };
+  return { seats, loading, error, selectedSeats, viewerCount };
 }
