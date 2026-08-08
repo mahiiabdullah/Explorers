@@ -7,8 +7,8 @@ interface SeatMapState {
   setSeats: (seats: Seat[]) => void;
   updateSeat: (seatId: string, patch: Partial<Seat>) => void;
 
-  // user-selected seats
-  selectedIds: Set<string>;
+  // user-selected seats (stored as array for proper Zustand reactivity)
+  selectedIds: string[];
   toggleSeat: (seatId: string) => void;
   clearSelection: () => void;
 
@@ -29,15 +29,17 @@ export const useSeatMapStore = create<SeatMapState>((set) => ({
       seats: state.seats.map((s) => (s.id === seatId ? { ...s, ...patch } : s)),
     })),
 
-  selectedIds: new Set(),
+  selectedIds: [],
   toggleSeat: (seatId) =>
     set((state) => {
-      const next = new Set(state.selectedIds);
-      if (next.has(seatId)) next.delete(seatId);
-      else next.add(seatId);
-      return { selectedIds: next };
+      const exists = state.selectedIds.includes(seatId);
+      return {
+        selectedIds: exists
+          ? state.selectedIds.filter((id) => id !== seatId)
+          : [...state.selectedIds, seatId],
+      };
     }),
-  clearSelection: () => set({ selectedIds: new Set() }),
+  clearSelection: () => set({ selectedIds: [] }),
 
   heldUntil: null,
   setHeldUntil: (heldUntil) => set({ heldUntil }),

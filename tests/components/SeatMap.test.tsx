@@ -13,7 +13,7 @@ const MOCK_SEATS: Seat[] = [
 
 describe('SeatMap', () => {
   beforeEach(() => {
-    useSeatMapStore.setState({ seats: [], selectedIds: new Set() });
+    useSeatMapStore.setState({ seats: [], selectedIds: [] });
   });
 
   it('renders all seats', () => {

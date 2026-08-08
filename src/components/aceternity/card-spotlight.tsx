@@ -37,7 +37,7 @@ export const CardSpotlight = ({
       )}
     >
       <div
-        className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"
+        className="pointer-events-none absolute -inset-px transition-opacity duration-300"
         style={{
           opacity,
           background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 40%)`,

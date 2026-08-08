@@ -82,6 +82,18 @@ const config: Config = {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        gradient: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        'screen-glow': {
+          '0%, 100%': { boxShadow: '0 0 40px 10px rgba(245, 165, 36, 0.2), inset 0 0 20px rgba(245, 165, 36, 0.3)' },
+          '50%': { boxShadow: '0 0 60px 15px rgba(245, 165, 36, 0.4), inset 0 0 30px rgba(245, 165, 36, 0.5)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
         'accordion-down': {
           from: { height: '0' },
           to: { height: 'var(--radix-accordion-content-height)' },
@@ -96,6 +108,9 @@ const config: Config = {
         glow: 'glow 2s ease-in-out infinite alternate',
         shimmer: 'shimmer 2s linear infinite',
         marquee: 'marquee 30s linear infinite',
+        gradient: 'gradient 8s ease-in-out infinite',
+        'screen-glow': 'screen-glow 3s ease-in-out infinite',
+        float: 'float 6s ease-in-out infinite',
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },

@@ -56,12 +56,12 @@ export default function SeatMapPage({ params }: { params: Promise<{ id: string }
 
   // Use mock data until backend integration
   const data = seats.length > 0 ? { seats, rows: MOCK_DATA.rows, cols: MOCK_DATA.cols, basePrice: MOCK_DATA.basePrice } : MOCK_DATA;
-  const selectedSeats = data.seats.filter((s) => selectedIds.has(s.id));
+  const selectedSeats = data.seats.filter((s) => selectedIds.includes(s.id));
 
   const handleHold = async () => {
     if (selectedSeats.length === 0) return;
     setHolding(true);
-    const seatIds = Array.from(selectedIds);
+    const seatIds = selectedIds;
     const { data: res, error } = await api.post<{ bookingId: string; heldUntil: string }>(endpoints.holdBooking(), {
       showtimeId,
       seatIds,

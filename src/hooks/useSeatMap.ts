@@ -18,16 +18,22 @@ export function useSeatMap(showtimeId: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial fetch
+  // Initial fetch — gracefully fall back to mock data on backend failure
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    setError(null);
+
+    // Skip backend fetch in development if NEXT_PUBLIC_API_URL is not set or returns errors
+    // The seat-map page itself handles the mock data fallback
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+      setLoading(false);
+      return;
+    }
 
     api.get<SeatMapResponse>(endpoints.showtimeSeats(showtimeId)).then(({ data, error }) => {
       if (!mounted) return;
       if (error || !data) {
-        setError(error?.message ?? 'Failed to load seats');
+        // Backend unavailable — silently fall back to mock data in page
         setLoading(false);
         return;
       }
@@ -41,8 +47,11 @@ export function useSeatMap(showtimeId: number) {
     };
   }, [showtimeId, setSeats, setViewerCount]);
 
-  // WebSocket subscription
+  // WebSocket subscription — only if backend is configured
   useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) return;
+
     const socket = connectSocket();
     joinShowtime(showtimeId);
 
@@ -50,13 +59,12 @@ export function useSeatMap(showtimeId: number) {
       if (e.showtimeId !== showtimeId) return;
       updateSeat(e.seatId, { status: e.status, heldUntil: e.heldUntil });
 
-      // If user had selected this seat and someone else grabbed it, deselect
-      if (selectedIds.has(e.seatId) && e.status === 'booked') {
+      if (selectedIds.includes(e.seatId) && e.status === 'booked') {
         clearSelection();
         toast({ type: 'error', title: 'Seat taken', description: `${e.seatId} was just booked by someone else.` });
       }
 
-      if (e.status === 'held' && !selectedIds.has(e.seatId)) {
+      if (e.status === 'held' && !selectedIds.includes(e.seatId)) {
         toast({ type: 'info', title: `Seat ${e.seatId} just got held` });
       }
     });
@@ -77,7 +85,7 @@ export function useSeatMap(showtimeId: number) {
     };
   }, [showtimeId, updateSeat, selectedIds, clearSelection, setViewerCount]);
 
-  const selectedSeats: Seat[] = seats.filter((s) => selectedIds.has(s.id));
+  const selectedSeats: Seat[] = seats.filter((s) => selectedIds.includes(s.id));
 
   return { seats, loading, error, selectedSeats, viewerCount };
 }

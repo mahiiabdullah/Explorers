@@ -13,7 +13,7 @@ interface SeatProps {
 export function Seat({ seat, basePrice }: SeatProps) {
   const selectedIds = useSeatMapStore((s) => s.selectedIds);
   const toggleSeat = useSeatMapStore((s) => s.toggleSeat);
-  const isSelected = selectedIds.has(seat.id);
+  const isSelected = selectedIds.includes(seat.id);
 
   const isPremium = seat.seatType === 'premium' || seat.seatType === 'recliner';
   const price = Math.round(basePrice * seat.priceModifier);
