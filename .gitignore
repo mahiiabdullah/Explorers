@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files (keep .env.example)
+.env
+.env.*
+!.env.example
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Local Docker volumes / runtime data
+pgdata/
+.tempo/
+.docker-data/
+
+# Prisma generated client (regenerated on `prisma generate`)
+CinemaTicket-backend/src/generated/
+
+# Git metadata backup (kept for one-time reference)
+.git-history-backup/
+
+# Local AI tooling state
+.puku/
+.puku-cli/
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# Keep .dockerignore files (they're not secrets)
+!.dockerignore

@@ -1,0 +1,170 @@
+# Cinema platform — full Docker Compose stack.
+#
+# Services:
+#   postgres   — primary database (Prisma)
+#   redis      — cache (backend tolerates being down)
+#   backend    — Express + Prisma API on :5000 (built locally)
+#   gateway    — Mock payment gateway on :9000 (pulled from DockerHub)
+#   frontend   — Next.js standalone on :3000 (built locally)
+#
+# Poridhi deployment (load balancer in front of the VM):
+#   The LB forwards public HTTPS to VM ports 3001 / 5001 / 9001.
+#   Containers internally listen on 3000 / 5000 / 9000 and we publish them
+#   with `3001:3000`, `5001:5000`, `9001:9000` so the LB hits the right
+#   port on the VM.
+#
+# Usage:
+#   docker compose pull gateway        # refresh the gateway image
+#   docker compose build               # build backend + frontend
+#   docker compose up -d               # start the stack
+#   docker compose down -v             # tear down + drop volumes
+#
+# All containers share the `cinema-net` bridge and resolve each other by
+# service name (http://backend:5000, http://gateway:9000, etc.).
+#
+# Public-facing URLs (Poridhi LB):
+#   FRONTEND_PUBLIC_URL = https://6a0b1d00950c78444441b4fb_0f8ad04d.lib.poridhi.io
+#   BACKEND_PUBLIC_URL  = https://6a0b1d00950c78444441b4fb_ba1b8620.lib.poridhi.io
+#   GATEWAY_PUBLIC_URL  = https://6a0b1d00950c78444441b4fb_89094519.lib.poridhi.io
+
+name: cinema
+
+services:
+  # ---------- Database ----------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cinema
+      POSTGRES_PASSWORD: cinema
+      POSTGRES_DB: cinema
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cinema -d cinema']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - cinema-net
+
+  # ---------- Cache ----------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '60', '1', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - cinema-net
+
+  # ---------- Backend API ----------
+  backend:
+    build:
+      context: ./CinemaTicket-backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # LB → VM:5001 → container:5000
+    ports:
+      - '5001:5000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '5000'
+      DATABASE_URL: postgresql://cinema:cinema@postgres:5432/cinema?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: mysecretkey
+      ACCESS_TOKEN_SECRET: accesssecret
+      REFRESH_TOKEN_SECRET: refreshsecret
+      ACCESS_TOKEN_EXPIRES_IN: 1d
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      # In-Docker traffic (gateway → backend webhook stays on the compose net).
+      GATEWAY_URL: http://gateway:9000
+      GATEWAY_SECRET: z2p-2026-secret
+      # Public-facing URLs that end up in CORS allowlist, redirect links, etc.
+      FRONTEND_URL: https://6a0b1d00950c78444441b4fb_0f8ad04d.lib.poridhi.io
+      # Internal Docker DNS — used to construct the webhook callbackUrl that
+      # the gateway POSTs back to the backend. Must be the in-network address,
+      # NOT the LB URL (the gateway can't reach the LB from inside the container).
+      BACKEND_URL: http://backend:5000
+    command:
+      - sh
+      - -c
+      - |
+        echo "[backend] applying migrations…"
+        npx prisma migrate deploy
+        echo "[backend] seeding (idempotent)…"
+        node dist/seed.js || echo "[backend] seed skipped/failed (ok if already seeded)"
+        echo "[backend] starting server…"
+        node dist/server.js
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:5000/']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - cinema-net
+
+  # ---------- Mock payment gateway (pulled from DockerHub) ----------
+  gateway:
+    image: asifmahmoud414/mock-gateway:latest
+    restart: unless-stopped
+    # LB → VM:9001 → container:9000
+    ports:
+      - '9001:9000'
+    environment:
+      NODE_ENV: production
+      PORT: '9000'
+      # Public URL users bounce back from after payment.
+      GATEWAY_PUBLIC_URL: https://6a0b1d00950c78444441b4fb_89094519.lib.poridhi.io
+      GATEWAY_SECRET: z2p-2026-secret
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:9000/']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cinema-net
+
+  # ---------- Frontend (Next.js standalone) ----------
+  frontend:
+    build:
+      context: ./cinema-app
+      dockerfile: Dockerfile
+      # NEXT_PUBLIC_* is inlined at build time — must point at the public LB URL.
+      args:
+        NEXT_PUBLIC_API_URL: https://6a0b1d00950c78444441b4fb_ba1b8620.lib.poridhi.io
+        NEXT_PUBLIC_SOCKET_URL: https://6a0b1d00950c78444441b4fb_ba1b8620.lib.poridhi.io
+        NEXT_PUBLIC_APP_URL: https://6a0b1d00950c78444441b4fb_0f8ad04d.lib.poridhi.io
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    # LB → VM:3001 → container:3000
+    ports:
+      - '3001:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - cinema-net
+
+networks:
+  cinema-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

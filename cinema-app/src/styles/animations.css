@@ -1,0 +1,49 @@
+/* Custom keyframes & utilities */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes screen-glow {
+  0%, 100% { box-shadow: 0 0 40px 10px rgba(245, 165, 36, 0.2), inset 0 0 20px rgba(245, 165, 36, 0.3); }
+  50% { box-shadow: 0 0 60px 15px rgba(245, 165, 36, 0.4), inset 0 0 30px rgba(245, 165, 36, 0.5); }
+}
+
+.screen-glow {
+  animation: screen-glow 3s ease-in-out infinite;
+}
+
+@keyframes seat-available {
+  0%, 100% { background-color: rgba(38, 38, 38, 1); }
+}
+@keyframes seat-held {
+  0%, 100% { background-color: rgba(245, 165, 36, 0.4); }
+  50% { background-color: rgba(245, 165, 36, 0.7); }
+}
+@keyframes seat-booked {
+  0%, 100% { background-color: rgba(220, 38, 38, 0.2); }
+}
+
+.seat-anim-available { animation: seat-available 2s ease-in-out infinite; }
+.seat-anim-held { animation: seat-held 1.5s ease-in-out infinite; }
+.seat-anim-booked { animation: seat-booked 2s ease-in-out infinite; }
+
+/* Cinematic text gradient */
+.text-cinema-gradient {
+  background: linear-gradient(135deg, #F5A524 0%, #EAB308 50%, #F5A524 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Smooth focus rings for keyboard nav */
+*:focus-visible {
+  outline: 2px solid #F5A524;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
