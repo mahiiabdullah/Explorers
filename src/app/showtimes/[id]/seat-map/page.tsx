@@ -33,7 +33,7 @@ const MOCK_DATA: SeatMapResponse = {
         id,
         row: String.fromCharCode(65 + row),
         col: col + 1,
-        seatType: isPremium ? 'premium' : 'regular',
+        seatType: (isPremium ? 'premium' : 'regular') as 'regular' | 'premium' | 'recliner' | 'couple',
         priceModifier: isPremium ? 1.4 : 1.0,
         status: (isBooked ? 'booked' : isHeld ? 'held' : 'available') as 'booked' | 'held' | 'available',
       };

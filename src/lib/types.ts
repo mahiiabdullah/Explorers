@@ -30,12 +30,12 @@ export interface Theatre {
 export interface Movie {
   id: number;
   title: string;
-  description: string;
-  posterUrl: string;
+  description?: string;
+  posterUrl?: string;
   durationMin: number;
   rating: number;
-  genre: string;
-  releaseDate: string;
+  genre?: string;
+  releaseDate?: string;
 }
 
 export interface Showtime {
@@ -55,7 +55,7 @@ export interface Booking {
   id: string;
   userId: string;
   showtimeId: number;
-  movie: Pick<Movie, 'id' | 'title' | 'posterUrl' | 'durationMin'>;
+  movie: Pick<Movie, 'id' | 'title' | 'posterUrl' | 'durationMin' | 'rating'>;
   theatre: Pick<Theatre, 'id' | 'name'>;
   screen: Pick<Screen, 'id' | 'name'>;
   seats: Seat[];

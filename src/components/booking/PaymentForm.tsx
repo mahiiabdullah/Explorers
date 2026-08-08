@@ -84,7 +84,7 @@ export function PaymentForm({ bookingId, totalAmount }: PaymentFormProps) {
           Secured with end-to-end encryption
         </div>
 
-        <ShimmerButton onClick={handlePay} disabled={loading} className="w-full" size="lg">
+        <ShimmerButton onClick={handlePay} disabled={loading} className="w-full h-14 text-lg">
           {loading ? 'Processing…' : `Pay ${formatCurrency(totalAmount)}`}
         </ShimmerButton>
       </CardContent>

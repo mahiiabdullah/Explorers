@@ -61,7 +61,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
             <Badge variant="default"><Star className="mr-1 h-3 w-3 fill-current" />{MOCK_MOVIE.rating.toFixed(1)}</Badge>
             <Badge variant="outline">{MOCK_MOVIE.genre}</Badge>
             <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />{formatDuration(MOCK_MOVIE.durationMin)}</Badge>
-            <Badge variant="outline"><Calendar className="mr-1 h-3 w-3" />{formatDate(MOCK_MOVIE.releaseDate)}</Badge>
+            <Badge variant="outline"><Calendar className="mr-1 h-3 w-3" />{formatDate(MOCK_MOVIE.releaseDate ?? new Date())}</Badge>
           </div>
 
           <h1 className="font-display text-5xl text-white md:text-6xl">{MOCK_MOVIE.title.toUpperCase()}</h1>

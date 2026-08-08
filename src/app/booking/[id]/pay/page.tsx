@@ -18,9 +18,6 @@ const MOCK_BOOKING: Booking = {
     posterUrl: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=200&h=300&fit=crop',
     durationMin: 165,
     rating: 9.1,
-    genre: 'Sci-Fi',
-    description: '',
-    releaseDate: '2026-08-15',
   },
   theatre: { id: 1, name: 'PVR Phoenix' },
   screen: { id: 4, name: '4' },
@@ -31,6 +28,7 @@ const MOCK_BOOKING: Booking = {
   startsAt: '2026-08-15T19:30:00Z',
   status: 'held',
   totalAmount: 98000,
+  createdAt: '2026-08-10T10:00:00Z',
 };
 
 export default function PayPage({ params }: { params: Promise<{ id: string }> }) {

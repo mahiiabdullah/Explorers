@@ -83,18 +83,20 @@ export default function HomePage() {
           <p className="mt-4 text-cinema-muted">Hand-picked blockbusters playing near you</p>
         </div>
         <BentoGrid>
-          <BentoGridItem
-            className="md:col-span-2 md:row-span-2"
-            header={<MovieCard movie={featuredMovies[0]} />}
-            title={featuredMovies[0].title}
-            description={featuredMovies[0].description}
-          />
+          {featuredMovies[0] && (
+            <BentoGridItem
+              className="md:col-span-2 md:row-span-2"
+              header={<MovieCard movie={featuredMovies[0]} />}
+              title={featuredMovies[0].title}
+              description={featuredMovies[0].description ?? ''}
+            />
+          )}
           {featuredMovies.slice(1, 5).map((m) => (
             <BentoGridItem
               key={m.id}
               header={<MovieCard movie={m} />}
               title={m.title}
-              description={m.description}
+              description={m.description ?? ''}
             />
           ))}
         </BentoGrid>

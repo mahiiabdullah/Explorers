@@ -17,11 +17,11 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
+  override componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 p-8 text-center">
