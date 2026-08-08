@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { toast } from '@/components/ui/toaster';
 import { api, endpoints } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import type { AuthResponse } from '@/lib/types';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name too short'),
@@ -26,6 +28,7 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
   const [loading, setLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
@@ -33,12 +36,14 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupForm) => {
     setLoading(true);
-    const { error } = await api.post<{ token: string }>(endpoints.signup(), data);
-    if (error) {
-      toast({ type: 'error', title: 'Signup failed', description: error.message });
+    const { data: res, error } = await api.post<AuthResponse>(endpoints.signup(), data);
+    if (error || !res) {
+      toast({ type: 'error', title: 'Signup failed', description: error?.message ?? 'Try again' });
       setLoading(false);
       return;
     }
+    setSession(res);
+    api.setToken(res.token);
     toast({ type: 'success', title: 'Account created!' });
     router.push('/movies');
   };

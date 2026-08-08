@@ -31,7 +31,7 @@ export function BookingSummary({ booking }: { booking: Booking }) {
           </div>
           <div className="flex items-center gap-2 text-cinema-muted">
             <Ticket className="h-4 w-4" />
-            <span>{booking.seats.map((s) => s.id).join(', ')}</span>
+            <span>{booking.seats.map((s) => `${s.row}${s.number}`).join(', ')}</span>
           </div>
         </div>
 

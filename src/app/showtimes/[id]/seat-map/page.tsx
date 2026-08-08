@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -9,60 +9,108 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SeatMap } from '@/components/seat-map/SeatMap';
 import { SelectionSummary } from '@/components/seat-map/SelectionSummary';
-import { useSeatMap } from '@/hooks/useSeatMap';
+import { ErrorState, LoadingState } from '@/components/shared/ErrorState';
+import { useAuthStore } from '@/stores/auth-store';
 import { useSeatMapStore } from '@/stores/seat-map-store';
 import { api, endpoints } from '@/lib/api';
 import { toast } from '@/components/ui/toaster';
-import { formatCurrency } from '@/lib/utils';
-import type { SeatMapResponse } from '@/lib/types';
-
-// Mock fallback data for development before backend is ready
-const MOCK_DATA: SeatMapResponse = {
-  showtimeId: 101,
-  rows: 10,
-  cols: 15,
-  basePrice: 35000,
-  viewerCount: 12,
-  seats: Array.from({ length: 10 }, (_, row) =>
-    Array.from({ length: 15 }, (_, col) => {
-      const id = `${String.fromCharCode(65 + row)}${col + 1}`;
-      const isBooked = Math.random() < 0.3;
-      const isHeld = !isBooked && Math.random() < 0.1;
-      const isPremium = row >= 6;
-      return {
-        id,
-        row: String.fromCharCode(65 + row),
-        col: col + 1,
-        seatType: (isPremium ? 'premium' : 'regular') as 'regular' | 'premium' | 'recliner' | 'couple',
-        priceModifier: isPremium ? 1.4 : 1.0,
-        status: (isBooked ? 'booked' : isHeld ? 'held' : 'available') as 'booked' | 'held' | 'available',
-      };
-    }),
-  ).flat(),
-};
+import { toFrontendSeat } from '@/lib/seats';
+import type { BackendSeat, HoldResponse, Showtime } from '@/lib/types';
 
 export default function SeatMapPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const { id: showtimeId } = params;
   const router = useRouter();
-  const showtimeId = Number(id);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [basePrice, setBasePrice] = useState<number>(0);
+  const [showtime, setShowtime] = useState<Showtime | null>(null);
+  const [layout, setLayout] = useState<{ rows: number; cols: number; theatreName?: string }>({
+    rows: 0,
+    cols: 0,
+  });
   const [holding, setHolding] = useState(false);
-  // Note: before backend is wired, fall back to mock data
-  const { loading, error } = useSeatMap(showtimeId);
+  const user = useAuthStore((s) => s.user);
+
   const seats = useSeatMapStore((s) => s.seats);
+  const setSeats = useSeatMapStore((s) => s.setSeats);
   const viewerCount = useSeatMapStore((s) => s.viewerCount);
   const selectedIds = useSeatMapStore((s) => s.selectedIds);
   const setHeldUntil = useSeatMapStore((s) => s.setHeldUntil);
   const clearSelection = useSeatMapStore((s) => s.clearSelection);
 
-  // Use mock data until backend integration
-  const data = seats.length > 0 ? { seats, rows: MOCK_DATA.rows, cols: MOCK_DATA.cols, basePrice: MOCK_DATA.basePrice } : MOCK_DATA;
-  const selectedSeats = data.seats.filter((s) => selectedIds.includes(s.id));
+  const fetchSeats = () => {
+    setLoading(true);
+    setError(null);
+    api
+      .get<BackendSeat[]>(endpoints.showtimeSeats(showtimeId))
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setSeats([]);
+        } else {
+          const list = data ?? [];
+          setSeats(list.map(toFrontendSeat));
+          // Derive rows/cols from the actual seat set.
+          const rowSet = new Set(list.map((s) => s.row));
+          const cols = list.length > 0 ? Math.max(...list.map((s) => s.number)) : 0;
+          setLayout((prev) => ({ ...(prev ?? {}), rows: rowSet.size, cols }));
+        }
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchSeats();
+    return () => clearSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showtimeId]);
+
+  // Resolve basePrice from the first seat's booking via showtime lookup,
+  // otherwise default to 0 — the seat map UI shows prices per-row even if
+  // we don't know the showtime price yet.
+  useEffect(() => {
+    // Try to derive basePrice from the showtime list endpoint indirectly —
+    // we don't have GET /showtimes/:id, but movies include showtimes.
+    api.get<unknown[]>(endpoints.movies()).then(({ data }) => {
+      if (!Array.isArray(data)) return;
+      for (const movie of data) {
+        const sts = (movie as { showtimes?: Showtime[] }).showtimes;
+        if (!Array.isArray(sts)) continue;
+        const match = sts.find((s) => s.id === showtimeId);
+        if (match) {
+          setBasePrice(match.basePrice);
+          setShowtime((prev) => ({
+            id: match.id,
+            movieId: match.movieId,
+            screenId: match.screenId,
+            basePrice: match.basePrice,
+            startsAt: match.startsAt,
+            ...(prev ?? {}),
+          }));
+          setLayout((prev) => ({
+            ...prev,
+            theatreName: match.screen?.theatre.name,
+          }));
+          break;
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showtimeId]);
+
+  const selectedSeats = useMemo(() => seats.filter((s) => selectedIds.includes(s.id)), [seats, selectedIds]);
 
   const handleHold = async () => {
     if (selectedSeats.length === 0) return;
+    if (!user) {
+      toast({ type: 'error', title: 'Please log in to hold seats' });
+      return;
+    }
     setHolding(true);
-    const seatIds = selectedIds;
-    const { data: res, error } = await api.post<{ bookingId: string; heldUntil: string }>(endpoints.holdBooking(), {
+    // Convert the user-facing seat labels ("A5") into backend showSeatIds.
+    const seatIds = selectedSeats.map((s) => s.showSeatId);
+    const { data: res, error } = await api.post<HoldResponse>(endpoints.holdBooking(), {
+      userId: user.id,
       showtimeId,
       seatIds,
     });
@@ -73,17 +121,21 @@ export default function SeatMapPage({ params }: { params: { id: string } }) {
       return;
     }
 
-    if (res) {
-      setHeldUntil(new Date(res.heldUntil));
-      toast({ type: 'success', title: 'Seats held!', description: 'You have 10 minutes to complete payment.' });
-      router.push(`/booking/${res.bookingId}/pay`);
+    if (res?.booking) {
+      setHeldUntil(res.booking.expiresAt ? new Date(res.booking.expiresAt) : null);
+      toast({ type: 'success', title: 'Seats held!', description: 'You have 5 minutes to complete payment.' });
+      router.push(`/booking/${res.booking.id}/pay`);
     }
     setHolding(false);
   };
 
+  const rows = layout.rows;
+  const cols = layout.cols;
+  const theatreName = layout.theatreName;
+
   return (
     <div className="container py-8">
-      <Link href="/movies">
+      <Link href={`/movies`}>
         <Button variant="ghost" size="sm" className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -95,7 +147,10 @@ export default function SeatMapPage({ params }: { params: { id: string } }) {
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-display text-3xl text-white md:text-4xl">PICK YOUR SEATS</h1>
-              <p className="mt-1 text-sm text-cinema-muted">Dune Part Three · PVR Phoenix · Today, 19:30</p>
+              <p className="mt-1 text-sm text-cinema-muted">
+                {theatreName ?? 'Loading theatre…'}
+                {showtime?.startsAt ? ` · ${new Date(showtime.startsAt).toLocaleString()}` : ''}
+              </p>
             </div>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2 rounded-full border border-cinema-border bg-cinema-surface px-3 py-1.5">
@@ -110,30 +165,31 @@ export default function SeatMapPage({ params }: { params: { id: string } }) {
           </div>
 
           {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <p className="text-cinema-muted">Loading seat map…</p>
-            </div>
+            <LoadingState message="Loading seat map…" />
           ) : error ? (
-            <div className="flex h-64 flex-col items-center justify-center gap-2">
-              <p className="text-cinema-crimson">Failed to load seats</p>
-              <p className="text-xs text-cinema-muted">{error}</p>
-            </div>
+            <ErrorState
+              title="Could not load seats"
+              description={error}
+              onRetry={fetchSeats}
+            />
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-              <SeatMap seats={data.seats} rows={data.rows} cols={data.cols} basePrice={data.basePrice} />
+              <SeatMap seats={seats} rows={rows} cols={cols} basePrice={basePrice} />
             </motion.div>
           )}
         </CardContent>
       </Card>
 
-      <div className="mt-6">
-        <SelectionSummary
-          selectedSeats={selectedSeats}
-          basePrice={data.basePrice}
-          onConfirm={handleHold}
-          loading={holding}
-        />
-      </div>
+      {!loading && !error && (
+        <div className="mt-6">
+          <SelectionSummary
+            selectedSeats={selectedSeats}
+            basePrice={basePrice}
+            onConfirm={handleHold}
+            loading={holding}
+          />
+        </div>
+      )}
     </div>
   );
 }

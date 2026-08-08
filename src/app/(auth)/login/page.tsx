@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { toast } from '@/components/ui/toaster';
 import { api, endpoints } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
+import type { AuthResponse } from '@/lib/types';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -24,6 +26,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
   const [loading, setLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -31,12 +34,14 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
-    const { error } = await api.post<{ token: string }>(endpoints.login(), data);
-    if (error) {
-      toast({ type: 'error', title: 'Login failed', description: error.message });
+    const { data: res, error } = await api.post<AuthResponse>(endpoints.login(), data);
+    if (error || !res) {
+      toast({ type: 'error', title: 'Login failed', description: error?.message ?? 'Try again' });
       setLoading(false);
       return;
     }
+    setSession(res);
+    api.setToken(res.token);
     toast({ type: 'success', title: 'Welcome back!' });
     router.push('/movies');
   };

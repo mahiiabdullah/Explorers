@@ -10,6 +10,8 @@ import { Lock, CreditCard, Smartphone, Wallet } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
 import { api, endpoints } from '@/lib/api';
+import { APP_URL } from '@/lib/constants';
+import type { PaymentChargeResponse } from '@/lib/types';
 
 interface PaymentFormProps {
   bookingId: string;
@@ -17,20 +19,33 @@ interface PaymentFormProps {
 }
 
 export function PaymentForm({ bookingId, totalAmount }: PaymentFormProps) {
-  const [method, setMethod] = useState('upi');
+  const [method, setMethod] = useState<'upi' | 'card' | 'wallet'>('upi');
   const [loading, setLoading] = useState(false);
 
   const handlePay = async () => {
     setLoading(true);
-    const { data, error } = await api.post<{ paymentUrl: string }>(endpoints.initiatePayment(), { bookingId });
+    // The backend constructs the webhook callbackUrl from its BACKEND_URL
+    // env var (which is `http://backend:5000` in Docker and
+    // `http://localhost:5000` in local dev). We just send the user-facing
+    // returnUrl so the gateway can bounce them back after the webhook.
+    const { data, error } = await api.post<PaymentChargeResponse>(endpoints.initiatePayment(), {
+      bookingId,
+      amount: totalAmount,
+      currency: 'BDT',
+      returnUrl: `${APP_URL}/booking/${bookingId}/confirmed`,
+    });
     if (error) {
       toast({ type: 'error', title: 'Payment failed', description: error.message });
       setLoading(false);
       return;
     }
-    if (data?.paymentUrl) {
-      window.location.href = data.paymentUrl;
+    const redirectUrl = data?.gatewayResponse?.redirect_url;
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+      return;
     }
+    toast({ type: 'error', title: 'Payment failed', description: 'No redirect URL received from gateway' });
+    setLoading(false);
   };
 
   return (
@@ -38,7 +53,7 @@ export function PaymentForm({ bookingId, totalAmount }: PaymentFormProps) {
       <CardContent className="space-y-6 p-6">
         <h3 className="font-display text-2xl text-white">PAYMENT METHOD</h3>
 
-        <Tabs value={method} onValueChange={setMethod}>
+        <Tabs value={method} onValueChange={(v) => setMethod(v as typeof method)}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upi"><Smartphone className="mr-1 h-4 w-4" />UPI</TabsTrigger>
             <TabsTrigger value="card"><CreditCard className="mr-1 h-4 w-4" />Card</TabsTrigger>
@@ -81,11 +96,11 @@ export function PaymentForm({ bookingId, totalAmount }: PaymentFormProps) {
 
         <div className="flex items-center gap-2 text-xs text-cinema-muted">
           <Lock className="h-3 w-3" />
-          Secured with end-to-end encryption
+          Secured by the mock payment gateway
         </div>
 
         <ShimmerButton onClick={handlePay} disabled={loading} className="w-full h-14 text-lg">
-          {loading ? 'Processing…' : `Pay ${formatCurrency(totalAmount)}`}
+          {loading ? 'Redirecting to gateway…' : `Pay ${formatCurrency(totalAmount)}`}
         </ShimmerButton>
       </CardContent>
     </Card>

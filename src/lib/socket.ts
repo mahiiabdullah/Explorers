@@ -30,11 +30,11 @@ export function disconnectSocket() {
   if (socket?.connected) socket.disconnect();
 }
 
-export function joinShowtime(showtimeId: number) {
+export function joinShowtime(showtimeId: string) {
   getSocket().emit('join:showtime', { showtimeId });
 }
 
-export function leaveShowtime(showtimeId: number) {
+export function leaveShowtime(showtimeId: string) {
   getSocket().emit('leave:showtime', { showtimeId });
 }
 

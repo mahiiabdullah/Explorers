@@ -7,7 +7,7 @@ import { api, endpoints } from '@/lib/api';
 import { toast } from '@/components/ui/toaster';
 import type { SeatMapResponse, Seat } from '@/lib/types';
 
-export function useSeatMap(showtimeId: number) {
+export function useSeatMap(showtimeId: string) {
   const seats = useSeatMapStore((s) => s.seats);
   const setSeats = useSeatMapStore((s) => s.setSeats);
   const updateSeat = useSeatMapStore((s) => s.updateSeat);

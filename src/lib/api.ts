@@ -1,12 +1,36 @@
-import { API_BASE } from './constants';
+import { API_BASE, API_VERSION_PREFIX } from './constants';
+import { useAuthStore } from '@/stores/auth-store';
 import type { ApiResponse } from './types';
+
+/**
+ * Backend response envelope (per backend/src/app/shared/sendResponse.ts):
+ *   Success: { success: true, statusCode, message, data }
+ *   Error:   { success: false, statusCode, message, error?: anything }
+ *
+ * We normalize both into the frontend's ApiResponse<T> = { data, error }.
+ */
+interface BackendSuccess<T> {
+  success: true;
+  statusCode?: number;
+  message?: string;
+  data?: T;
+}
+
+interface BackendFailure {
+  success: false;
+  statusCode?: number;
+  message?: string;
+  error?: unknown;
+}
+
+type BackendResponse<T> = BackendSuccess<T> | BackendFailure;
 
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+    this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
   setToken(token: string | null) {
@@ -19,14 +43,21 @@ class ApiClient {
     body?: unknown,
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
+    const cleanPath = path.startsWith(API_VERSION_PREFIX)
+      ? path
+      : `${API_VERSION_PREFIX}${path.startsWith('/') ? path : `/${path}`}`;
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(options.headers as Record<string, string>),
       };
-      if (this.token) headers.Authorization = `Bearer ${this.token}`;
+      // Prefer the persisted token from the auth store so the request
+      // always carries the latest credentials (avoids stale closures).
+      const storeToken = this.token ?? useAuthStore.getState().token;
+      if (storeToken) headers.Authorization = `Bearer ${storeToken}`;
 
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(`${this.baseUrl}${cleanPath}`, {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
@@ -34,15 +65,22 @@ class ApiClient {
         ...options,
       });
 
-      const json = await res.json().catch(() => null);
+      const json = (await res.json().catch(() => null)) as BackendResponse<T> | null;
 
-      if (!res.ok) {
+      if (!res.ok || (json && json.success === false)) {
+        const failure = json && 'error' in json ? (json as BackendFailure) : null;
         return {
           data: null,
-          error: json?.error ?? { code: 'UNKNOWN', message: `HTTP ${res.status}` },
+          error: {
+            code: `HTTP_${res.status}`,
+            message: failure?.message ?? json?.message ?? `HTTP ${res.status}`,
+            details: failure?.error as Record<string, unknown> | undefined,
+          },
         };
       }
-      return { data: json?.data ?? json, error: null };
+
+      const data = json && 'data' in json ? (json.data ?? null) : ((json as unknown) as T | null);
+      return { data, error: null };
     } catch (err) {
       return {
         data: null,
@@ -70,20 +108,37 @@ class ApiClient {
 
 export const api = new ApiClient(API_BASE);
 
-// Typed endpoint helpers
+// Typed endpoint helpers — paths are written WITHOUT the /api/v1 prefix;
+// the client adds it automatically.
 export const endpoints = {
-  movies: (filters?: { genre?: string; date?: string }) => {
-    const qs = new URLSearchParams(filters as Record<string, string>).toString();
-    return `/api/movies${qs ? `?${qs}` : ''}`;
+  // Auth
+  signup: () => '/auth/signup',
+  login: () => '/auth/login',
+  logout: () => '/auth/logout',
+  me: () => '/auth/me',
+  otpSend: () => '/auth/otp/send',
+  otpVerify: () => '/auth/otp/verify',
+
+  // Movies & showtimes
+  movies: () => '/movies',
+  movie: (id: string) => `/movies/${id}`,
+  showtime: (id: string) => `/showtimes/${id}`,
+  showtimeSeats: (id: string) => `/showtimes/${id}/seats`,
+
+  // Bookings
+  holdBooking: () => '/bookings/hold',
+  confirmBooking: (id: string) => `/bookings/${id}/confirm`,
+  booking: (id: string) => `/bookings/${id}`,
+  bookings: (filters?: { userId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.userId) params.set('userId', filters.userId);
+    if (filters?.status) params.set('status', filters.status);
+    const qs = params.toString();
+    return `/bookings${qs ? `?${qs}` : ''}`;
   },
-  movie: (id: number | string) => `/api/movies/${id}`,
-  showtimeSeats: (id: number | string) => `/api/showtimes/${id}/seats`,
-  holdBooking: () => '/api/bookings/hold',
-  booking: (id: string) => `/api/bookings/${id}`,
-  bookings: () => '/api/bookings',
-  initiatePayment: () => '/api/payment/initiate',
-  login: () => '/api/auth/login',
-  signup: () => '/api/auth/signup',
-  me: () => '/api/auth/me',
-  logout: () => '/api/auth/logout',
+
+  // Payment
+  initiatePayment: () => '/payments/charge',
+  refundPayment: () => '/payments/refund',
+  paymentWebhook: () => '/payments/webhooks/payment',
 };

@@ -1,15 +1,102 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Check, Download, CalendarPlus, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfettiOnMount } from '@/components/magicui/confetti';
+import { ErrorState, LoadingState } from '@/components/shared/ErrorState';
+import { api, endpoints } from '@/lib/api';
 import { formatDate, formatTime } from '@/lib/utils';
+import type { BookingDetail, Showtime } from '@/lib/types';
 
 export default function ConfirmedPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [showtime, setShowtime] = useState<Showtime | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    let attempts = 0;
+
+    const fetchBooking = () => {
+      api.get<BookingDetail>(endpoints.booking(id)).then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          setError(error.message);
+          return;
+        }
+        setBooking(data);
+        if (data && data.status === 'CONFIRMED') {
+          // We can stop polling once we know the booking is confirmed.
+        }
+      });
+    };
+
+    fetchBooking();
+    const interval = setInterval(() => {
+      attempts += 1;
+      if (attempts > 30) {
+        clearInterval(interval);
+        return;
+      }
+      fetchBooking();
+    }, 2000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [id]);
+
+  // Resolve showtime info for display
+  useEffect(() => {
+    if (!booking) return;
+    api.get<unknown[]>(endpoints.movies()).then(({ data }) => {
+      if (!Array.isArray(data)) return;
+      for (const movie of data) {
+        const sts = (movie as { showtimes?: Showtime[] }).showtimes;
+        if (!Array.isArray(sts)) continue;
+        const match = sts.find((s) => s.id === booking.showtimeId);
+        if (match) {
+          setShowtime(match);
+          break;
+        }
+      }
+    });
+  }, [booking]);
+
+  const isConfirmed = booking?.status === 'CONFIRMED';
+
+  if (error && !booking) {
+    return (
+      <div className="container max-w-2xl py-12">
+        <ErrorState title="Could not load booking" description={error} onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="container max-w-2xl py-12">
+        <LoadingState message="Confirming your booking…" />
+      </div>
+    );
+  }
+
+  if (!isConfirmed) {
+    return (
+      <div className="container max-w-2xl py-12">
+        <LoadingState message="Awaiting payment confirmation from the gateway…" />
+        <p className="mt-4 text-center text-xs text-cinema-muted">
+          If this takes more than 30 seconds, please refresh the page.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-2xl py-12">
@@ -49,23 +136,27 @@ export default function ConfirmedPage({ params }: { params: { id: string } }) {
           <CardContent className="space-y-4 p-6">
             <div className="flex items-center justify-between border-b border-cinema-border pb-4">
               <span className="text-sm text-cinema-muted">Booking ID</span>
-              <span className="font-mono text-white">{id}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-cinema-muted">Movie</span>
-              <span className="text-white">Dune Part Three</span>
+              <span className="font-mono text-white">{booking.id}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-cinema-muted">Theatre</span>
-              <span className="text-white">PVR Phoenix</span>
+              <span className="text-white">{showtime?.screen?.theatre.name ?? '—'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-cinema-muted">Date & Time</span>
-              <span className="text-white">{formatDate('2026-08-15')} · {formatTime('2026-08-15T19:30:00Z')}</span>
+              <span className="text-white">
+                {showtime ? `${formatDate(showtime.startsAt)} · ${formatTime(showtime.startsAt)}` : '—'}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-cinema-muted">Seats</span>
-              <span className="text-white">E5, E6 (Premium)</span>
+              <span className="text-white">
+                {(booking.seats ?? []).map((s) => `${s.row}${s.number}`).join(', ') || '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-cinema-muted">Amount</span>
+              <span className="text-white">৳{(booking.amount / 100).toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>

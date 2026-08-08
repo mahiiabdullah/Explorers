@@ -33,7 +33,7 @@ export function Seat({ seat, basePrice }: SeatProps) {
       onClick={handleClick}
       disabled={isBooked || isHeld}
       aria-label={`Seat ${seat.id}, ${seat.seatType}, ${isBooked ? 'booked' : isHeld ? 'held' : isSelected ? 'selected' : 'available'}`}
-      title={`${seat.id} · ${seat.seatType} · ₹${price}`}
+      title={`${seat.id} · ${seat.seatType} · ৳${price}`}
       className={cn(
         'relative aspect-square rounded-md border text-[10px] font-medium transition-all',
         'flex items-center justify-center',

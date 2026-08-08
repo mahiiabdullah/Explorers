@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Building2, Users } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency, formatTime } from '@/lib/utils';
@@ -10,14 +10,14 @@ import type { Showtime } from '@/lib/types';
 
 interface ShowtimePickerProps {
   showtimes: Showtime[];
-  movieId: number | string;
 }
 
-export function ShowtimePicker({ showtimes, movieId }: ShowtimePickerProps) {
+export function ShowtimePicker({ showtimes }: ShowtimePickerProps) {
   // Group by theatre
   const byTheatre = showtimes.reduce((acc, s) => {
-    if (!acc[s.theatreName]) acc[s.theatreName] = [];
-    acc[s.theatreName]!.push(s);
+    const theatre = s.screen?.theatre.name ?? 'Theatre';
+    if (!acc[theatre]) acc[theatre] = [];
+    acc[theatre]!.push(s);
     return acc;
   }, {} as Record<string, Showtime[]>);
 
@@ -46,10 +46,6 @@ export function ShowtimePicker({ showtimes, movieId }: ShowtimePickerProps) {
                       >
                         <span className="font-display text-xl text-white group-hover:text-cinema-amber">
                           {formatTime(s.startsAt)}
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-cinema-muted">
-                          <Users className="h-3 w-3" />
-                          {s.availableSeats}/{s.totalSeats} seats
                         </span>
                         <span className="text-xs text-cinema-amber">
                           {formatCurrency(s.basePrice)}

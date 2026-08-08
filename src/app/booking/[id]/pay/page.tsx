@@ -1,38 +1,115 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BookingSummary } from '@/components/booking/BookingSummary';
 import { PaymentForm } from '@/components/booking/PaymentForm';
-import type { Booking } from '@/lib/types';
-
-const MOCK_BOOKING: Booking = {
-  id: 'bk_123',
-  userId: 'user_1',
-  showtimeId: 101,
-  movie: {
-    id: 1,
-    title: 'Dune Part Three',
-    posterUrl: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=200&h=300&fit=crop',
-    durationMin: 165,
-    rating: 9.1,
-  },
-  theatre: { id: 1, name: 'PVR Phoenix' },
-  screen: { id: 4, name: '4' },
-  seats: [
-    { id: 'E5', row: 'E', col: 5, seatType: 'premium', priceModifier: 1.4, status: 'held' },
-    { id: 'E6', row: 'E', col: 6, seatType: 'premium', priceModifier: 1.4, status: 'held' },
-  ],
-  startsAt: '2026-08-15T19:30:00Z',
-  status: 'held',
-  totalAmount: 98000,
-  createdAt: '2026-08-10T10:00:00Z',
-};
+import { ErrorState, LoadingState } from '@/components/shared/ErrorState';
+import { api, endpoints } from '@/lib/api';
+import type { BackendSeat, Booking, BookingDetail, Movie, Showtime } from '@/lib/types';
 
 export default function PayPage({ params }: { params: { id: string } }) {
   const { id } = params;
-  const booking = { ...MOCK_BOOKING, id };
+  const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [showtime, setShowtime] = useState<Showtime | null>(null);
+  const [movie, setMovie] = useState<Movie | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchBooking = () => {
+    setLoading(true);
+    setError(null);
+    api.get<BookingDetail>(endpoints.booking(id)).then(({ data, error }) => {
+      if (error) {
+        setError(error.message);
+        setBooking(null);
+      } else {
+        setBooking(data);
+      }
+      setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    fetchBooking();
+  }, [id]);
+
+  // Resolve showtime + movie for convenience fee / display
+  useEffect(() => {
+    if (!booking) return;
+    api.get<Movie[]>(endpoints.movies()).then(({ data }) => {
+      if (!Array.isArray(data)) return;
+      for (const m of data) {
+        const sts = (m as Movie).showtimes;
+        if (!Array.isArray(sts)) continue;
+        const match = sts.find((s) => s.id === booking.showtimeId);
+        if (match) {
+          setShowtime(match);
+          setMovie(m);
+          break;
+        }
+      }
+    });
+  }, [booking]);
+
+  const summary: Booking | null = useMemo(() => {
+    if (!booking) return null;
+    const seats: BackendSeat[] = booking.seats ?? [];
+    const theatreName = showtime?.screen?.theatre.name ?? 'Theatre';
+    return {
+      id: booking.id,
+      userId: booking.userId,
+      showtimeId: booking.showtimeId,
+      status: booking.status,
+      amount: booking.amount,
+      totalAmount: booking.amount,
+      expiresAt: booking.expiresAt,
+      heldUntil: booking.expiresAt ?? undefined,
+      createdAt: booking.createdAt,
+      seats,
+      movie: {
+        id: movie?.id ?? '',
+        title: movie?.title ?? 'Booking',
+        posterUrl: movie?.posterUrl ?? '',
+        durationMin: movie?.durationMin ?? 0,
+        rating: movie?.rating ?? 0,
+      },
+      theatre: {
+        id: showtime?.screen?.theatre.id ?? '',
+        name: theatreName,
+      },
+      screen: {
+        id: showtime?.screen?.id ?? booking.showtimeId,
+        name: showtime?.screen?.name ?? 'Screen',
+      },
+      startsAt: showtime?.startsAt ?? booking.createdAt,
+    };
+  }, [booking, movie, showtime]);
+
+  if (loading) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <LoadingState message="Loading booking…" />
+      </div>
+    );
+  }
+
+  if (error || !booking) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <ErrorState
+          title={error ?? 'Booking not found'}
+          description="The booking may have expired."
+          onRetry={fetchBooking}
+        />
+      </div>
+    );
+  }
+
+  if (!summary) return null;
+
   const convenienceFee = 3000;
 
   return (
@@ -47,8 +124,8 @@ export default function PayPage({ params }: { params: { id: string } }) {
       <h1 className="mb-8 font-display text-4xl text-cinema-gradient">COMPLETE PAYMENT</h1>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <BookingSummary booking={booking} />
-        <PaymentForm bookingId={booking.id} totalAmount={booking.totalAmount + convenienceFee} />
+        <BookingSummary booking={summary} />
+        <PaymentForm bookingId={booking.id} totalAmount={booking.amount + convenienceFee} />
       </div>
     </div>
   );
